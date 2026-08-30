@@ -1,8 +1,7 @@
 # ML Practice: Help-Desk Ticket Triage
 
 Ungraded practice for BCS2143 / BIT3203, built to train the exact tool
-combination the **Final Assessment's Task 4 (ML pipeline and evaluation,
-25 marks)** will check: loading and auditing a CSV, cleaning it with pandas,
+combination the **Final Assessment's ML pipeline and evaluation** will check: loading and auditing a CSV, cleaning it with pandas,
 holding out a fixed test set, comparing a `DummyClassifier` baseline against
 one trained classifier through a shared preprocessing scaffold, and reporting
 accuracy, macro-F1 and a confusion matrix.
@@ -55,10 +54,8 @@ only `src/app.py` and, once your pipeline runs, `REFLECTION.md`.
 
 ## Why this matters for the Final Assessment
 
-Task 4 is worth more marks than any other single task. The pattern you
-practice here - baseline vs. classifier, accuracy *and* macro-F1 *and* a
+The pattern you practice here - baseline vs. classifier, accuracy *and* macro-F1 *and* a
 confusion matrix, features chosen deliberately rather than left to
 guesswork - is exactly what the marking rubric rewards. A green check on
-this practice repository does not predict your Final Assessment mark; it
-tells you that you can currently build the pipeline the Final Assessment
+this practice repository tells you that you can currently build the pipeline the Final Assessment
 requires.

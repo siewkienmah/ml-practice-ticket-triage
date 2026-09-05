@@ -1,12 +1,5 @@
 name: Practice CI
 
-# Runs the automated practice checks on every push to a fork and on every
-# pull request opened back to this repository. Because contributors are
-# students working from their own forks (not collaborators on this repo),
-# GitHub will hold each run for a maintainer's approval before it executes -
-# see INSTRUCTOR_SETUP.md to turn that on, and approve runs from the
-# repository's Actions tab.
-
 on:
   pull_request:
     branches: [main]
@@ -39,10 +32,10 @@ jobs:
       - name: Run practice checks
         run: pytest -v
 
-      - name: Run the pipeline end-to-end
+      - name: Run the pipeline end to end
         run: python -m src.app --data data/helpdesk_tickets.csv --output outputs/result.json
 
-      - name: Upload your result for your own records
+      - name: Upload the result for the student's records
         if: always()
         uses: actions/upload-artifact@v4
         with:

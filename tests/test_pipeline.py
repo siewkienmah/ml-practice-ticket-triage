@@ -112,4 +112,6 @@ def test_run_writes_output_file(tmp_path):
         assert section in saved
         for key in ("accuracy", "macro_f1", "labels", "confusion_matrix"):
             assert key in saved[section]
+    assert len(saved["test_index"]) == len(saved["actual"])
+    assert len(saved["actual"]) == len(saved["classifier"]["predicted"])
     assert saved == result

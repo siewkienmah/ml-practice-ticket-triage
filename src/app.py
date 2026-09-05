@@ -103,6 +103,12 @@ def run(data_path: str = "data/helpdesk_tickets.csv", output_path: str = "output
         "classifier": evaluate_predictions(classifier, x_test, y_test),
     }
 
+    # Keep the held-out row references and true labels beside the predictions.
+    # Students need these fields to identify and explain specific errors in
+    # REFLECTION.md without reconstructing the split in a separate notebook.
+    result["test_index"] = [int(index) for index in x_test.index]
+    result["actual"] = y_test.tolist()
+
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w") as f:
         json.dump(result, f, indent=2)
@@ -110,8 +116,9 @@ def run(data_path: str = "data/helpdesk_tickets.csv", output_path: str = "output
     print(f"Baseline   accuracy={result['baseline']['accuracy']:.3f}  macro_f1={result['baseline']['macro_f1']:.3f}")
     print(f"Classifier accuracy={result['classifier']['accuracy']:.3f}  macro_f1={result['classifier']['macro_f1']:.3f}")
 
-    # TODO (Task 4e): inspect at least three rows your classifier got wrong
-    # (compare result['classifier']['predicted'] against y_test.tolist()).
+    # TODO (Task 4e): inspect at least three rows your classifier got wrong.
+    # Compare result['classifier']['predicted'] with result['actual']; use
+    # result['test_index'] to locate each original ticket in the CSV.
     # Write one defensible feature/preprocessing improvement, and one
     # bias/fairness/deployment limitation, into REFLECTION.md.
 

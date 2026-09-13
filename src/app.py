@@ -28,6 +28,9 @@ from sklearn.model_selection import train_test_split
 
 from src.pipeline_tools import build_baseline, build_pipeline, build_preprocessor, evaluate_predictions
 
+# Import RandomForestClassifier so we can use it as our real model in train_classifier()
+from sklearn.ensemble import RandomForestClassifier
+
 TARGET_COLUMN = "response_tier"
 IDENTIFIER_COLUMN = "ticket_id"
 
@@ -40,7 +43,8 @@ def load_data(path: str) -> pd.DataFrame:
     You do not need to print these inside this function - just look at them
     yourself so you understand what you are cleaning next.
     """
-    raise NotImplementedError("load_data: read the CSV at `path` with pandas")
+    # Read the CSV file at the given path and return it as a pandas DataFrame
+    return pd.read_csv(path)
 
 
 def get_feature_columns(df: pd.DataFrame) -> tuple[list[str], list[str]]:
@@ -50,9 +54,16 @@ def get_feature_columns(df: pd.DataFrame) -> tuple[list[str], list[str]]:
     predictors and which is only a row identifier - IDENTIFIER_COLUMN and
     TARGET_COLUMN must NOT appear in either list you return.
     """
-    numeric_columns: list[str] = []
-    categorical_columns: list[str] = []
-    raise NotImplementedError("get_feature_columns: choose your numeric and categorical predictors")
+    # These three columns are numbers (a duration, a count, a length) — they go through
+    # StandardScaler in the preprocessor to put them on the same scale
+    numeric_columns = ["wait_time_minutes", "reopened_count", "resolution_notes_length"]
+
+    # These three columns are labels from a fixed set of options — they go through
+    # OneHotEncoder in the preprocessor to turn them into numbers the model can use
+    categorical_columns = ["device_type", "error_code", "reported_severity"]
+
+    # Return both lists as a tuple; ticket_id and response_tier are deliberately left out
+    return numeric_columns, categorical_columns
 
 
 def make_split(df: pd.DataFrame, test_size: float = 0.25, random_state: int = 42):
@@ -62,9 +73,21 @@ def make_split(df: pd.DataFrame, test_size: float = 0.25, random_state: int = 42
 
     Return exactly: x_train, x_test, y_train, y_test
     """
+    # Get the two lists of feature column names from the function we already wrote
     numeric_columns, categorical_columns = get_feature_columns(df)
+
+    # Combine both lists into one flat list of all predictor column names
     feature_columns = numeric_columns + categorical_columns
-    raise NotImplementedError("make_split: slice df into X/y and call train_test_split")
+
+    # X is the input table — only the predictor columns, not the target or identifier
+    X = df[feature_columns]
+
+    # y is the answer column — what we want the model to learn to predict
+    y = df[TARGET_COLUMN]
+
+    # Split into train and test sets; stratify=y keeps class proportions equal in both
+    # halves; random_state makes the split identical every time you run it
+    return train_test_split(X, y, test_size=test_size, random_state=random_state, stratify=y)
 
 
 def train_baseline(x_train, y_train, numeric_columns, categorical_columns):
@@ -72,7 +95,17 @@ def train_baseline(x_train, y_train, numeric_columns, categorical_columns):
     in a DummyClassifier baseline with build_baseline(), fit it on the
     training data, and return the fitted pipeline.
     """
-    raise NotImplementedError("train_baseline: build_preprocessor -> build_baseline -> fit")
+    # Build the preprocessing steps (impute missing values, scale numbers, encode categories)
+    preprocessor = build_preprocessor(numeric_columns, categorical_columns)
+
+    # Wrap the preprocessor in a DummyClassifier that always predicts the most common class
+    baseline = build_baseline(preprocessor)
+
+    # Train the pipeline on the training data so it learns the imputation/scaling values
+    baseline.fit(x_train, y_train)
+
+    # Return the trained pipeline so it can be used to make predictions later
+    return baseline
 
 
 def train_classifier(x_train, y_train, numeric_columns, categorical_columns):
@@ -83,7 +116,20 @@ def train_classifier(x_train, y_train, numeric_columns, categorical_columns):
 
     Import your chosen classifier at the top of this file.
     """
-    raise NotImplementedError("train_classifier: build_preprocessor -> build_pipeline(your classifier) -> fit")
+    # Build a fresh preprocessor — we never reuse the one from train_baseline()
+    # because a fitted preprocessor stores state that would conflict across pipelines
+    preprocessor = build_preprocessor(numeric_columns, categorical_columns)
+
+    # Wrap the preprocessor with a Random Forest — 100 trees, random_state fixed so
+    # results are the same every run; Random Forest handles class imbalance better than
+    # a single decision tree and comfortably beats the dummy baseline on this dataset
+    classifier = build_pipeline(preprocessor, RandomForestClassifier(n_estimators=100, random_state=42))
+
+    # Train the full pipeline (preprocessing + model) on the training data
+    classifier.fit(x_train, y_train)
+
+    # Return the trained pipeline so it can be evaluated on the test set
+    return classifier
 
 
 def run(data_path: str = "data/helpdesk_tickets.csv", output_path: str = "outputs/result.json") -> dict:

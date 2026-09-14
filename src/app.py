@@ -24,6 +24,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 
 from src.pipeline_tools import build_baseline, build_pipeline, build_preprocessor, evaluate_predictions
@@ -33,38 +34,48 @@ IDENTIFIER_COLUMN = "ticket_id"
 
 
 def load_data(path: str) -> pd.DataFrame:
-    """TODO (Task 4a): load the CSV at `path` with pandas and return it.
-
-    Before moving on, run this in a notebook or a scratch script and look at:
-    df.shape, df.dtypes, df.isna().sum(), and df[TARGET_COLUMN].value_counts().
-    You do not need to print these inside this function - just look at them
-    yourself so you understand what you are cleaning next.
-    """
-    raise NotImplementedError("load_data: read the CSV at `path` with pandas")
+    """TODO (Task 4a): load the CSV at `path` with pandas and return it."""
+    return pd.read_csv(path)
 
 
 def get_feature_columns(df: pd.DataFrame) -> tuple[list[str], list[str]]:
     """TODO (Task 4b): return (numeric_columns, categorical_columns).
 
-    Look at the columns in data/README.md. Decide which columns are genuine
-    predictors and which is only a row identifier - IDENTIFIER_COLUMN and
-    TARGET_COLUMN must NOT appear in either list you return.
+    Excludes IDENTIFIER_COLUMN ("ticket_id") and TARGET_COLUMN ("response_tier").
     """
     numeric_columns: list[str] = []
     categorical_columns: list[str] = []
-    raise NotImplementedError("get_feature_columns: choose your numeric and categorical predictors")
+
+    for col in df.columns:
+        if col in (IDENTIFIER_COLUMN, TARGET_COLUMN):
+            continue
+        if pd.api.types.is_numeric_dtype(df[col]):
+            numeric_columns.append(col)
+        else:
+            categorical_columns.append(col)
+
+    return numeric_columns, categorical_columns
 
 
 def make_split(df: pd.DataFrame, test_size: float = 0.25, random_state: int = 42):
     """TODO (Task 4c): build X (features) and y (target), then call
-    sklearn's train_test_split with a FIXED random_state and stratify=y so
-    the split is reproducible and every class is represented in both sets.
+    sklearn's train_test_split with a FIXED random_state and stratify=y.
 
     Return exactly: x_train, x_test, y_train, y_test
     """
     numeric_columns, categorical_columns = get_feature_columns(df)
     feature_columns = numeric_columns + categorical_columns
-    raise NotImplementedError("make_split: slice df into X/y and call train_test_split")
+
+    X = df[feature_columns]
+    y = df[TARGET_COLUMN]
+
+    return train_test_split(
+        X,
+        y,
+        test_size=test_size,
+        random_state=random_state,
+        stratify=y,
+    )
 
 
 def train_baseline(x_train, y_train, numeric_columns, categorical_columns):
@@ -72,25 +83,26 @@ def train_baseline(x_train, y_train, numeric_columns, categorical_columns):
     in a DummyClassifier baseline with build_baseline(), fit it on the
     training data, and return the fitted pipeline.
     """
-    raise NotImplementedError("train_baseline: build_preprocessor -> build_baseline -> fit")
+    preprocessor = build_preprocessor(numeric_columns, categorical_columns)
+    baseline_pipeline = build_baseline(preprocessor)
+    baseline_pipeline.fit(x_train, y_train)
+    return baseline_pipeline
 
 
 def train_classifier(x_train, y_train, numeric_columns, categorical_columns):
     """TODO (Task 4c): build a preprocessor, wrap ONE real scikit-learn
-    classifier of your choice in it with build_pipeline() (for example
-    DecisionTreeClassifier, LogisticRegression or KNeighborsClassifier),
-    fit it, and return the fitted pipeline.
-
-    Import your chosen classifier at the top of this file.
+    classifier of your choice in it with build_pipeline(), fit it, and return
+    the fitted pipeline.
     """
-    raise NotImplementedError("train_classifier: build_preprocessor -> build_pipeline(your classifier) -> fit")
+    preprocessor = build_preprocessor(numeric_columns, categorical_columns)
+    model = LogisticRegression(random_state=42, max_iter=1000)
+    classifier_pipeline = build_pipeline(preprocessor, model)
+    classifier_pipeline.fit(x_train, y_train)
+    return classifier_pipeline
 
 
 def run(data_path: str = "data/helpdesk_tickets.csv", output_path: str = "outputs/result.json") -> dict:
-    """Provided - wires your functions together and saves outputs/result.json.
-    You should not need to edit this, but read it so you know what it expects
-    from the functions above.
-    """
+    """Provided - wires your functions together and saves outputs/result.json."""
     df = load_data(data_path)
     numeric_columns, categorical_columns = get_feature_columns(df)
     x_train, x_test, y_train, y_test = make_split(df)
@@ -103,9 +115,6 @@ def run(data_path: str = "data/helpdesk_tickets.csv", output_path: str = "output
         "classifier": evaluate_predictions(classifier, x_test, y_test),
     }
 
-    # Keep the held-out row references and true labels beside the predictions.
-    # Students need these fields to identify and explain specific errors in
-    # REFLECTION.md without reconstructing the split in a separate notebook.
     result["test_index"] = [int(index) for index in x_test.index]
     result["actual"] = y_test.tolist()
 
@@ -115,12 +124,6 @@ def run(data_path: str = "data/helpdesk_tickets.csv", output_path: str = "output
 
     print(f"Baseline   accuracy={result['baseline']['accuracy']:.3f}  macro_f1={result['baseline']['macro_f1']:.3f}")
     print(f"Classifier accuracy={result['classifier']['accuracy']:.3f}  macro_f1={result['classifier']['macro_f1']:.3f}")
-
-    # TODO (Task 4e): inspect at least three rows your classifier got wrong.
-    # Compare result['classifier']['predicted'] with result['actual']; use
-    # result['test_index'] to locate each original ticket in the CSV.
-    # Write one defensible feature/preprocessing improvement, and one
-    # bias/fairness/deployment limitation, into REFLECTION.md.
 
     return result
 

@@ -17,6 +17,7 @@ Run it with:
 Check your work with:
     pytest -v
 """
+
 from __future__ import annotations
 
 import argparse
@@ -24,113 +25,250 @@ import json
 from pathlib import Path
 
 import pandas as pd
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 
-from src.pipeline_tools import build_baseline, build_pipeline, build_preprocessor, evaluate_predictions
+from src.pipeline_tools import (
+    build_baseline,
+    build_pipeline,
+    build_preprocessor,
+    evaluate_predictions,
+)
+
 
 TARGET_COLUMN = "response_tier"
 IDENTIFIER_COLUMN = "ticket_id"
 
 
 def load_data(path: str) -> pd.DataFrame:
-    """TODO (Task 4a): load the CSV at `path` with pandas and return it.
+    """Load the CSV at `path` with pandas and return it."""
 
-    Before moving on, run this in a notebook or a scratch script and look at:
-    df.shape, df.dtypes, df.isna().sum(), and df[TARGET_COLUMN].value_counts().
-    You do not need to print these inside this function - just look at them
-    yourself so you understand what you are cleaning next.
-    """
-    raise NotImplementedError("load_data: read the CSV at `path` with pandas")
+    df = pd.read_csv(path)
+
+    return df
 
 
 def get_feature_columns(df: pd.DataFrame) -> tuple[list[str], list[str]]:
-    """TODO (Task 4b): return (numeric_columns, categorical_columns).
+    """Return (numeric_columns, categorical_columns).
 
-    Look at the columns in data/README.md. Decide which columns are genuine
-    predictors and which is only a row identifier - IDENTIFIER_COLUMN and
-    TARGET_COLUMN must NOT appear in either list you return.
+    The identifier and target columns are excluded because they are not
+    predictors.
     """
-    numeric_columns: list[str] = []
-    categorical_columns: list[str] = []
-    raise NotImplementedError("get_feature_columns: choose your numeric and categorical predictors")
+
+    # Start with all columns except the identifier and target.
+    feature_columns = [
+        column
+        for column in df.columns
+        if column not in {IDENTIFIER_COLUMN, TARGET_COLUMN}
+    ]
+
+    # Numeric predictors.
+    numeric_columns = df[feature_columns].select_dtypes(
+        include=["number"]
+    ).columns.tolist()
+
+    # Categorical predictors.
+    categorical_columns = df[feature_columns].select_dtypes(
+        exclude=["number"]
+    ).columns.tolist()
+
+    return numeric_columns, categorical_columns
 
 
-def make_split(df: pd.DataFrame, test_size: float = 0.25, random_state: int = 42):
-    """TODO (Task 4c): build X (features) and y (target), then call
-    sklearn's train_test_split with a FIXED random_state and stratify=y so
-    the split is reproducible and every class is represented in both sets.
+def make_split(
+    df: pd.DataFrame,
+    test_size: float = 0.25,
+    random_state: int = 42
+):
+    """Build X and y, then make a fixed stratified train/test split.
 
-    Return exactly: x_train, x_test, y_train, y_test
+    Returns:
+        x_train, x_test, y_train, y_test
     """
+
     numeric_columns, categorical_columns = get_feature_columns(df)
+
     feature_columns = numeric_columns + categorical_columns
-    raise NotImplementedError("make_split: slice df into X/y and call train_test_split")
+
+    # X = predictor/features
+    X = df[feature_columns]
+
+    # y = target/class to predict
+    y = df[TARGET_COLUMN]
+
+    # Fixed random_state makes the split reproducible.
+    # stratify=y keeps the class proportions similar in train/test.
+    x_train, x_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=test_size,
+        random_state=random_state,
+        stratify=y,
+    )
+
+    return x_train, x_test, y_train, y_test
 
 
-def train_baseline(x_train, y_train, numeric_columns, categorical_columns):
-    """TODO (Task 4c): build a preprocessor with build_preprocessor(), wrap it
-    in a DummyClassifier baseline with build_baseline(), fit it on the
-    training data, and return the fitted pipeline.
+def train_baseline(
+    x_train,
+    y_train,
+    numeric_columns,
+    categorical_columns
+):
+    """Build and train the DummyClassifier baseline."""
+
+    # Build the same preprocessing step used by the real classifier.
+    preprocessor = build_preprocessor(
+        numeric_columns,
+        categorical_columns
+    )
+
+    # Build the DummyClassifier baseline.
+    baseline = build_baseline(preprocessor)
+
+    # Train the baseline using the training data only.
+    baseline.fit(x_train, y_train)
+
+    return baseline
+
+
+def train_classifier(
+    x_train,
+    y_train,
+    numeric_columns,
+    categorical_columns
+):
+    """Build and train one real scikit-learn classifier.
+
+    LogisticRegression is used as the real classifier.
     """
-    raise NotImplementedError("train_baseline: build_preprocessor -> build_baseline -> fit")
+
+    # Build the preprocessing step.
+    preprocessor = build_preprocessor(
+        numeric_columns,
+        categorical_columns
+    )
+
+    # Build the real ML pipeline.
+    classifier = build_pipeline(
+        preprocessor,
+        LogisticRegression(
+            max_iter=1000,
+            random_state=42
+        )
+    )
+
+    # Train only on the training data.
+    classifier.fit(x_train, y_train)
+
+    return classifier
 
 
-def train_classifier(x_train, y_train, numeric_columns, categorical_columns):
-    """TODO (Task 4c): build a preprocessor, wrap ONE real scikit-learn
-    classifier of your choice in it with build_pipeline() (for example
-    DecisionTreeClassifier, LogisticRegression or KNeighborsClassifier),
-    fit it, and return the fitted pipeline.
+def run(
+    data_path: str = "data/helpdesk_tickets.csv",
+    output_path: str = "outputs/result.json"
+) -> dict:
+    """Run the complete ML pipeline and save the results."""
 
-    Import your chosen classifier at the top of this file.
-    """
-    raise NotImplementedError("train_classifier: build_preprocessor -> build_pipeline(your classifier) -> fit")
-
-
-def run(data_path: str = "data/helpdesk_tickets.csv", output_path: str = "outputs/result.json") -> dict:
-    """Provided - wires your functions together and saves outputs/result.json.
-    You should not need to edit this, but read it so you know what it expects
-    from the functions above.
-    """
     df = load_data(data_path)
+
     numeric_columns, categorical_columns = get_feature_columns(df)
+
     x_train, x_test, y_train, y_test = make_split(df)
 
-    baseline = train_baseline(x_train, y_train, numeric_columns, categorical_columns)
-    classifier = train_classifier(x_train, y_train, numeric_columns, categorical_columns)
+    baseline = train_baseline(
+        x_train,
+        y_train,
+        numeric_columns,
+        categorical_columns
+    )
+
+    classifier = train_classifier(
+        x_train,
+        y_train,
+        numeric_columns,
+        categorical_columns
+    )
 
     result = {
-        "baseline": evaluate_predictions(baseline, x_test, y_test),
-        "classifier": evaluate_predictions(classifier, x_test, y_test),
+        "baseline": evaluate_predictions(
+            baseline,
+            x_test,
+            y_test
+        ),
+        "classifier": evaluate_predictions(
+            classifier,
+            x_test,
+            y_test
+        ),
     }
 
-    # Keep the held-out row references and true labels beside the predictions.
-    # Students need these fields to identify and explain specific errors in
-    # REFLECTION.md without reconstructing the split in a separate notebook.
-    result["test_index"] = [int(index) for index in x_test.index]
+    # Keep the held-out row references and true labels beside predictions.
+    result["test_index"] = [
+        int(index) for index in x_test.index
+    ]
+
     result["actual"] = y_test.tolist()
 
-    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    # Create output directory if it does not already exist.
+    Path(output_path).parent.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    # Save results as JSON.
     with open(output_path, "w") as f:
         json.dump(result, f, indent=2)
 
-    print(f"Baseline   accuracy={result['baseline']['accuracy']:.3f}  macro_f1={result['baseline']['macro_f1']:.3f}")
-    print(f"Classifier accuracy={result['classifier']['accuracy']:.3f}  macro_f1={result['classifier']['macro_f1']:.3f}")
+    print(
+        f"Baseline   "
+        f"accuracy={result['baseline']['accuracy']:.3f}  "
+        f"macro_f1={result['baseline']['macro_f1']:.3f}"
+    )
 
-    # TODO (Task 4e): inspect at least three rows your classifier got wrong.
-    # Compare result['classifier']['predicted'] with result['actual']; use
-    # result['test_index'] to locate each original ticket in the CSV.
-    # Write one defensible feature/preprocessing improvement, and one
-    # bias/fairness/deployment limitation, into REFLECTION.md.
+    print(
+        f"Classifier "
+        f"accuracy={result['classifier']['accuracy']:.3f}  "
+        f"macro_f1={result['classifier']['macro_f1']:.3f}"
+    )
+
+    # TODO (Task 4e):
+    #
+    # Inspect at least three rows that the classifier predicted incorrectly.
+    #
+    # Compare:
+    #     result["classifier"]["predicted"]
+    #     result["actual"]
+    #
+    # Use:
+    #     result["test_index"]
+    #
+    # to locate the original rows in the CSV.
+    #
+    # Then write the findings in REFLECTION.md.
 
     return result
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data", default="data/helpdesk_tickets.csv")
-    parser.add_argument("--output", default="outputs/result.json")
+
+    parser.add_argument(
+        "--data",
+        default="data/helpdesk_tickets.csv"
+    )
+
+    parser.add_argument(
+        "--output",
+        default="outputs/result.json"
+    )
+
     args = parser.parse_args()
-    run(args.data, args.output)
+
+    run(
+        args.data,
+        args.output
+    )
 
 
 if __name__ == "__main__":

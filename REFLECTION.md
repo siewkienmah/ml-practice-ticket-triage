@@ -1,29 +1,13 @@
-# Reflection (Task 4e practice)
-
-Fill this in after `python -m src.app` runs successfully.
-
 ## Three errors
 
-Open `outputs/result.json`. The lists `test_index`, `actual` and
-`classifier.predicted` use the same order. Compare each prediction with its
-true label. When they differ, use the matching `test_index` value to locate
-the original ticket in `data/helpdesk_tickets.csv`.
-
-1. CSV row index ___: predicted `___`, actually `___`. Which feature values
-   may have led the model towards the wrong class?
-2. CSV row index ___: predicted `___`, actually `___`. Which feature values
-   may have led the model towards the wrong class?
-3. CSV row index ___: predicted `___`, actually `___`. Which feature values
-   may have led the model towards the wrong class?
+1. CSV row index 66: predicted `escalate_now`, actually `assign_technician`. The model probably got confused by the `reopened_count` being 3. It might have given too much weight to the ticket being reopened multiple times, even though the `reported_severity` was only "low".
+2. CSV row index 196: predicted `assign_technician`, actually `escalate_now`. The `reported_severity` was "high", but the `resolution_notes_length` was very short (only 74 characters). The model might incorrectly think that short notes mean it is not a serious issue yet.
+3. CSV row index 217: predicted `assign_technician`, actually `log_only`. The `error_code` was missing (NaN). Our preprocessor probably filled this empty spot with the most common error code from the dataset, which tricked the model into thinking there was a real error when it was just a log.
 
 ## One defensible improvement
 
-Describe one specific, defensible change to your features or preprocessing
-that might reduce these errors (not "use a bigger model" - something you
-could implement and test).
+Instead of filling missing categorical values (like the empty `error_code` in row 217) with the most frequent item, I would change the preprocessor to fill them with a specific word like "Missing". This way, the model learns that an empty error code is its own distinct clue, rather than getting confused by fake, assumed data that we injected during preprocessing.
 
 ## One limitation
 
-State one bias, fairness, or deployment limitation of this classifier if it
-were actually used to route real help-desk tickets. Who could be affected,
-and how?
+If we used this in a real IT helpdesk, it could unfairly delay help for brand-new, urgent problems. As seen in row 196, a severe ticket might not get escalated just because it hasn't been worked on long enough to have long notes. This means the model penalizes tickets that haven't been touched yet, meaning a genuinely urgent ticket might sit in the queue simply because an IT worker hasn't had time to type out a long paragraph about it.

@@ -1,15 +1,10 @@
 """ML PRACTICE: Help-Desk Ticket Triage
 ======================================
 
-Trains the exact tool combination the Final Assessment's ML task (Task 4)
-will check: load and audit a CSV, clean it with pandas, hold out a fixed
-test set, compare a DummyClassifier baseline against one trained classifier
-through the supplied preprocessing scaffold, and report accuracy, macro-F1
-and a confusion matrix.
+Trains the exact tool combination the Final Assessment's ML task (Task 4) will check: load and audit a CSV, clean it with pandas, hold out a fixed test set, compare a DummyClassifier baseline against one trained classifier
+through the supplied preprocessing scaffold, and report accuracy, macro-F1 and a confusion matrix.
 
-Complete every TODO below. Do not rename the functions, their arguments, or
-TARGET_COLUMN / IDENTIFIER_COLUMN - the tests and the CI workflow call these
-functions directly by name.
+Complete every TODO below. Do not rename the functions, their arguments, or TARGET_COLUMN / IDENTIFIER_COLUMN - the tests and the CI workflow call these functions directly by name.
 
 Run it with:
     python -m src.app --data data/helpdesk_tickets.csv --output outputs/result.json
@@ -24,6 +19,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
 from src.pipeline_tools import build_baseline, build_pipeline, build_preprocessor, evaluate_predictions
@@ -40,7 +36,7 @@ def load_data(path: str) -> pd.DataFrame:
     You do not need to print these inside this function - just look at them
     yourself so you understand what you are cleaning next.
     """
-    raise NotImplementedError("load_data: read the CSV at `path` with pandas")
+    return pd.read_csv(path)
 
 
 def get_feature_columns(df: pd.DataFrame) -> tuple[list[str], list[str]]:
@@ -50,9 +46,18 @@ def get_feature_columns(df: pd.DataFrame) -> tuple[list[str], list[str]]:
     predictors and which is only a row identifier - IDENTIFIER_COLUMN and
     TARGET_COLUMN must NOT appear in either list you return.
     """
-    numeric_columns: list[str] = []
-    categorical_columns: list[str] = []
-    raise NotImplementedError("get_feature_columns: choose your numeric and categorical predictors")
+    excluded = {IDENTIFIER_COLUMN, TARGET_COLUMN}
+
+    numeric_columns = [
+        col for col in df.select_dtypes(include=['number']).columns
+        if col not in excluded
+    ]
+    categorical_columns = [
+        col for col in df.select_dtypes(include=['object', 'category']).columns
+        if col not in excluded
+    ]
+
+    return numeric_columns, categorical_columns
 
 
 def make_split(df: pd.DataFrame, test_size: float = 0.25, random_state: int = 42):
@@ -64,7 +69,18 @@ def make_split(df: pd.DataFrame, test_size: float = 0.25, random_state: int = 42
     """
     numeric_columns, categorical_columns = get_feature_columns(df)
     feature_columns = numeric_columns + categorical_columns
-    raise NotImplementedError("make_split: slice df into X/y and call train_test_split")
+
+    X = df[feature_columns]
+    y = df[TARGET_COLUMN]
+
+    x_train, x_test, y_train, y_test = train_test_split(
+        X, y,
+        test_size=test_size,
+        random_state=random_state,
+        stratify=y,
+    )
+
+    return x_train, x_test, y_train, y_test
 
 
 def train_baseline(x_train, y_train, numeric_columns, categorical_columns):
@@ -72,7 +88,10 @@ def train_baseline(x_train, y_train, numeric_columns, categorical_columns):
     in a DummyClassifier baseline with build_baseline(), fit it on the
     training data, and return the fitted pipeline.
     """
-    raise NotImplementedError("train_baseline: build_preprocessor -> build_baseline -> fit")
+    preprocessor = build_preprocessor(numeric_columns, categorical_columns)
+    baseline = build_baseline(preprocessor)
+    baseline.fit(x_train, y_train)
+    return baseline
 
 
 def train_classifier(x_train, y_train, numeric_columns, categorical_columns):
@@ -83,7 +102,11 @@ def train_classifier(x_train, y_train, numeric_columns, categorical_columns):
 
     Import your chosen classifier at the top of this file.
     """
-    raise NotImplementedError("train_classifier: build_preprocessor -> build_pipeline(your classifier) -> fit")
+    preprocessor = build_preprocessor(numeric_columns, categorical_columns)
+    my_model = RandomForestClassifier(random_state=42)
+    pipeline = build_pipeline(preprocessor, my_model)
+    pipeline.fit(x_train, y_train)
+    return pipeline
 
 
 def run(data_path: str = "data/helpdesk_tickets.csv", output_path: str = "outputs/result.json") -> dict:

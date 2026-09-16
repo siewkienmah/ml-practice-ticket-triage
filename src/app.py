@@ -25,6 +25,7 @@ from pathlib import Path
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier
 
 from src.pipeline_tools import build_baseline, build_pipeline, build_preprocessor, evaluate_predictions
 
@@ -40,7 +41,7 @@ def load_data(path: str) -> pd.DataFrame:
     You do not need to print these inside this function - just look at them
     yourself so you understand what you are cleaning next.
     """
-    raise NotImplementedError("load_data: read the CSV at `path` with pandas")
+    return pd.read_csv(path)
 
 
 def get_feature_columns(df: pd.DataFrame) -> tuple[list[str], list[str]]:
@@ -50,9 +51,17 @@ def get_feature_columns(df: pd.DataFrame) -> tuple[list[str], list[str]]:
     predictors and which is only a row identifier - IDENTIFIER_COLUMN and
     TARGET_COLUMN must NOT appear in either list you return.
     """
-    numeric_columns: list[str] = []
-    categorical_columns: list[str] = []
-    raise NotImplementedError("get_feature_columns: choose your numeric and categorical predictors")
+    numeric_columns = [
+        "wait_time_minutes",
+        "reopened_count",
+        "resolution_notes_length",
+    ]
+    categorical_columns = [
+        "device_type",
+        "error_code",
+        "reported_severity",
+    ]
+    return numeric_columns, categorical_columns
 
 
 def make_split(df: pd.DataFrame, test_size: float = 0.25, random_state: int = 42):
@@ -64,7 +73,14 @@ def make_split(df: pd.DataFrame, test_size: float = 0.25, random_state: int = 42
     """
     numeric_columns, categorical_columns = get_feature_columns(df)
     feature_columns = numeric_columns + categorical_columns
-    raise NotImplementedError("make_split: slice df into X/y and call train_test_split")
+    X = df[feature_columns]
+    y = df[TARGET_COLUMN]
+    return train_test_split(
+        X, y,
+        test_size=test_size,
+        random_state=random_state,
+        stratify=y,
+    )
 
 
 def train_baseline(x_train, y_train, numeric_columns, categorical_columns):
@@ -72,7 +88,10 @@ def train_baseline(x_train, y_train, numeric_columns, categorical_columns):
     in a DummyClassifier baseline with build_baseline(), fit it on the
     training data, and return the fitted pipeline.
     """
-    raise NotImplementedError("train_baseline: build_preprocessor -> build_baseline -> fit")
+    preprocessor = build_preprocessor(numeric_columns, categorical_columns)
+    model = build_baseline(preprocessor)
+    model.fit(x_train, y_train)
+    return model
 
 
 def train_classifier(x_train, y_train, numeric_columns, categorical_columns):
@@ -83,7 +102,10 @@ def train_classifier(x_train, y_train, numeric_columns, categorical_columns):
 
     Import your chosen classifier at the top of this file.
     """
-    raise NotImplementedError("train_classifier: build_preprocessor -> build_pipeline(your classifier) -> fit")
+    preprocessor = build_preprocessor(numeric_columns, categorical_columns)
+    model = build_pipeline(preprocessor, DecisionTreeClassifier(random_state=42))
+    model.fit(x_train, y_train)
+    return model
 
 
 def run(data_path: str = "data/helpdesk_tickets.csv", output_path: str = "outputs/result.json") -> dict:

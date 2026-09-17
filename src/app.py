@@ -18,6 +18,8 @@ Check your work with:
     pytest -v
 """
 from __future__ import annotations
+from sklearn.dummy import DummyClassifier
+from sklearn.linear_model import LogisticRegression
 
 import argparse
 import json
@@ -33,48 +35,102 @@ IDENTIFIER_COLUMN = "ticket_id"
 
 
 def load_data(path: str) -> pd.DataFrame:
-    """TODO (Task 4a): load the CSV at `path` with pandas and return it.
-
-    Before moving on, run this in a notebook or a scratch script and look at:
-    df.shape, df.dtypes, df.isna().sum(), and df[TARGET_COLUMN].value_counts().
-    You do not need to print these inside this function - just look at them
-    yourself so you understand what you are cleaning next.
-    """
-    raise NotImplementedError("load_data: read the CSV at `path` with pandas")
+    """TODO (Task 4a): load the CSV with pandas."""
+    return pd.read_csv(path)
 
 
-def get_feature_columns(df: pd.DataFrame) -> tuple[list[str], list[str]]:
-    """TODO (Task 4b): return (numeric_columns, categorical_columns).
+def get_feature_columns(
+    df: pd.DataFrame,
+) -> tuple[list[str], list[str]]:
+    """TODO (Task 4b): return numeric and categorical feature columns."""
 
-    Look at the columns in data/README.md. Decide which columns are genuine
-    predictors and which is only a row identifier - IDENTIFIER_COLUMN and
-    TARGET_COLUMN must NOT appear in either list you return.
-    """
-    numeric_columns: list[str] = []
-    categorical_columns: list[str] = []
-    raise NotImplementedError("get_feature_columns: choose your numeric and categorical predictors")
+    feature_df = df.drop(
+        columns=[IDENTIFIER_COLUMN, TARGET_COLUMN],
+        errors="ignore",
+    )
+
+    numeric_columns = feature_df.select_dtypes(
+        include="number"
+    ).columns.tolist()
+
+    categorical_columns = feature_df.select_dtypes(
+        exclude="number"
+    ).columns.tolist()
+
+    return numeric_columns, categorical_columns
 
 
-def make_split(df: pd.DataFrame, test_size: float = 0.25, random_state: int = 42):
-    """TODO (Task 4c): build X (features) and y (target), then call
-    sklearn's train_test_split with a FIXED random_state and stratify=y so
-    the split is reproducible and every class is represented in both sets.
+def make_split(
+    df: pd.DataFrame,
+    test_size: float = 0.25,
+    random_state: int = 42,
+):
+    """TODO (Task 4c): create a reproducible stratified train/test split."""
 
-    Return exactly: x_train, x_test, y_train, y_test
-    """
     numeric_columns, categorical_columns = get_feature_columns(df)
     feature_columns = numeric_columns + categorical_columns
-    raise NotImplementedError("make_split: slice df into X/y and call train_test_split")
+
+    X = df[feature_columns]
+    y = df[TARGET_COLUMN]
+
+    x_train, x_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=test_size,
+        random_state=random_state,
+        stratify=y,
+    )
+
+    return x_train, x_test, y_train, y_test
 
 
-def train_baseline(x_train, y_train, numeric_columns, categorical_columns):
-    """TODO (Task 4c): build a preprocessor with build_preprocessor(), wrap it
-    in a DummyClassifier baseline with build_baseline(), fit it on the
-    training data, and return the fitted pipeline.
-    """
-    raise NotImplementedError("train_baseline: build_preprocessor -> build_baseline -> fit")
+def train_baseline(
+    x_train,
+    y_train,
+    numeric_columns,
+    categorical_columns,
+):
+    """TODO (Task 4c): train the baseline model."""
+def train_baseline(
+    x_train,
+    y_train,
+    numeric_columns,
+    categorical_columns,
+):
+    """TODO (Task 4c): train the baseline model."""
 
+    preprocessor = build_preprocessor(
+        numeric_columns,
+        categorical_columns
+    )
 
+    classifier = DummyClassifier(strategy="most_frequent")
+
+    pipeline = build_pipeline(
+        preprocessor,
+        classifier
+    )
+
+    pipeline.fit(x_train, y_train)
+
+    return pipeline
+    """TODO (Task 4c): create a reproducible stratified train/test split."""
+
+    numeric_columns, categorical_columns = get_feature_columns(df)
+    feature_columns = numeric_columns + categorical_columns
+
+    X = df[feature_columns]
+    y = df[TARGET_COLUMN]
+
+    x_train, x_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=test_size,
+        random_state=random_state,
+        stratify=y,
+    )
+
+    return x_train, x_test, y_train, y_test
 def train_classifier(x_train, y_train, numeric_columns, categorical_columns):
     """TODO (Task 4c): build a preprocessor, wrap ONE real scikit-learn
     classifier of your choice in it with build_pipeline() (for example
@@ -83,8 +139,32 @@ def train_classifier(x_train, y_train, numeric_columns, categorical_columns):
 
     Import your chosen classifier at the top of this file.
     """
-    raise NotImplementedError("train_classifier: build_preprocessor -> build_pipeline(your classifier) -> fit")
+def train_classifier(
+    x_train,
+    y_train,
+    numeric_columns,
+    categorical_columns,
+):
+    """TODO (Task 4c): train a real classifier."""
 
+    preprocessor = build_preprocessor(
+        numeric_columns,
+        categorical_columns
+    )
+
+    classifier = LogisticRegression(
+        max_iter=1000,
+        random_state=42
+    )
+
+    pipeline = build_pipeline(
+        preprocessor,
+        classifier
+    )
+
+    pipeline.fit(x_train, y_train)
+
+    return pipeline
 
 def run(data_path: str = "data/helpdesk_tickets.csv", output_path: str = "outputs/result.json") -> dict:
     """Provided - wires your functions together and saves outputs/result.json.
